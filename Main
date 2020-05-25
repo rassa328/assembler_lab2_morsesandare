@@ -1,0 +1,118 @@
+.equ N = 5	;går ej att höra med N=1 (20ms beep) så testa N=5
+
+START:
+	sbi DDRB,4
+	ldi	ZH,HIGH(TEXT*2)
+	ldi	ZL,LOW(TEXT*2)
+	ldi r16,high(RAMEND)
+	out SPH,r16
+	ldi r16,low(RAMEND)
+	out SPL,r16
+
+
+MORSE:
+	call GET_CHAR
+	cpi r16,0x00
+DONE:
+	breq DONE
+	cpi r16,0x20
+	breq SPACE
+	call LOOKUP
+	call SEND
+	ldi r16,2
+	call NO_BEEP
+	jmp MORSE
+
+	SPACE:
+		ldi r16,7
+		call NO_BEEP
+		jmp MORSE
+	
+SEND:
+	call GET_BIT	
+	call SEND_BITS
+	ret
+
+SEND_BITS:
+	breq NO_BITS
+	brcc BEEP_SHORT
+	brcs BEEP_LONG 
+	BEEP_DONE:
+		push r16
+		ldi r16,1
+		call NO_BEEP
+		pop r16
+		call GET_BIT
+		jmp SEND_BITS
+
+	BEEP_SHORT:
+		push r16
+		ldi r16,1
+		call BEEP
+		pop r16
+		jmp BEEP_DONE
+		
+
+	BEEP_LONG:
+		push r16
+		ldi r16,3
+		call BEEP
+		pop r16
+		jmp BEEP_DONE
+
+	NO_BITS:
+		ret
+
+GET_BIT:
+	lsl r16
+	ret
+
+
+
+GET_CHAR:
+	lpm r16,Z+
+	ret
+
+LOOKUP:
+	push ZH
+	push ZL
+	subi r16,0x41
+	ldi	ZH,HIGH(BTAB*2)   
+	ldi	ZL,LOW(BTAB*2)
+	add ZL,r16
+	lpm r16,Z
+	pop ZL
+	pop ZH
+	ret						
+
+BEEP:
+	sbi PORTB,4
+	call DELAY
+	cbi PORTB,4
+	ret
+
+NO_BEEP:
+	cbi PORTB,4
+	call DELAY
+	ret
+
+DELAY: ;beroende på r16
+	ldi r17,N
+	muls r17,r16
+	mov r16,r0
+D1:
+	ldi r17,10
+D2:
+	adiw r24,8
+	brne D2
+	dec r17
+	brne D2
+	dec r16
+	brne D1
+	ret
+
+TEXT:
+	.db "RASSA RASSA RASSA",$00
+
+BTAB:
+	.db $60,$88,$A8,$90,$40,$28,$D0,$08,$20,$78,$B0,$48,$E0,$A0,$F0,$68,$D8,$50,$10,$C0,$30,$18,$70,$98,$B8,$C8
